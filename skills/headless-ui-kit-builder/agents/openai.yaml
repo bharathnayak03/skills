@@ -1,0 +1,4 @@
+interface:
+  display_name: "Headless UI Kit Builder"
+  short_description: "Build reusable React UI kits with Headless UI"
+  default_prompt: "Use $headless-ui-kit-builder to create or retrofit a reusable Headless UI-based React UI kit for this app."
