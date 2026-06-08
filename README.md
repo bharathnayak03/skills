@@ -26,11 +26,22 @@ You can also install directly from GitHub:
 hermes skills install bharathnayak03/hermes-skills-public/personal-data-tracker-app --yes
 ```
 
+## Skills index
+
+- `personal-data-tracker-app`: Build and maintain Hermes-first personal data trackers
+  (calorie tracker, refill tracker, medicines, workouts, and similar apps).
+
 ## Publishing updates
 
 When you add or update skills in this repo, publish by committing then pushing to this
 repository. Because this repo is the source of truth for community taps, consumers can
 find the latest version from the public repo.
+
+To add another skill:
+
+1. Create a new folder under `skills/` named after the skill (`skills/your-skill-name/`).
+2. Add a `SKILL.md` and any `references/`/`templates/` files.
+3. Update this README index section.
 
 ```bash
 git add .
