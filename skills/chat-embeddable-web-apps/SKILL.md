@@ -1,253 +1,245 @@
 ---
 name: chat-embeddable-web-apps
-description: Use when the user asks to create any small HTML/web app or interactive browser artifact, run it from the local container, expose it publicly, and embed or preview it in chat/Discord/Telegram.
-version: 1.1.0
+description: Publish produced HTML as a temporary chat-openable UI by serving it locally, exposing it with Cloudflare Tunnel, and returning a verified URL.
+version: 2.0.0
 author: Hermes Agent
 license: MIT
 metadata:
   hermes:
-    tags: [html, web-app, interactive, preview, embed, localtunnel, discord, telegram]
+    tags: [html, web-app, ui, preview, cloudflared, cloudflare-tunnel, discord, telegram]
     related_skills: [visual-design-artifacts]
 ---
 
 # Chat-Embeddable Web Apps
 
-## Overview
+## Purpose
 
-Use this skill when the user wants any small browser artifact — static HTML, a prototype, form, calculator, visual demo, interactive widget, status page, chart, game, landing-page mock, or generated preview — and asks to “embed it here”, “run a web server”, “share the app in chat”, or “make it accessible from Discord/Telegram”.
+Use this skill when an agent has produced an HTML UI and the user needs to open it from a chat app such as Discord, Telegram, or WhatsApp.
 
-The key lesson: **localhost is not accessible from the user’s chat client**. A local server must either be exposed through a public tunnel, deployed to a public host, or accompanied by a media preview/screenshot attachment. For quick one-off previews inside a Hermes session, a local static server plus a public tunnel is usually the fastest path.
+The job of this skill is narrow and generic:
 
-## When to Use
+1. take the produced HTML,
+2. write it to an artifact folder,
+3. serve it from a local HTTP server,
+4. expose that server through Cloudflare Tunnel using `cloudflared`,
+5. verify the public URL,
+6. return the URL to the user.
 
-- User asks for a small HTML page, prototype, or web app and wants to see/open it from chat.
-- User asks to run a local web server and embed/share the link.
-- User says they cannot access localhost from Discord/Telegram/WhatsApp.
-- User wants a public preview URL for an artifact produced in the container.
-- User wants a chat-friendly preview image plus a clickable public URL.
-- User wants a one-off app without full production deployment.
+Do not make this skill about the kind of content inside the HTML. Treat the HTML as an opaque browser artifact unless the user asks for changes to the UI itself.
 
-Don’t use this skill for production deployments with persistence, authentication, custom domains, CI/CD, or long-term hosting. For those, use a normal deployment workflow such as Vercel, Netlify, Fly.io, Render, or the project’s established hosting process, and verify the deployed URL.
+## When to use
 
-## Artifact Types This Skill Covers
+Use this skill when:
 
-| User asks for | Good deliverable |
-|---|---|
-| “Make a small HTML page” | Self-contained `index.html` with inline CSS and minimal JS |
-| “Make a mini app / demo” | Static app folder with `index.html`, optional `app.js`, `style.css`, assets |
-| “Make it interactive” | Browser-side JavaScript; avoid backend unless required |
-| “Show project data” | HTML generated from real CLI/API/file data, plus refresh instructions |
-| “Embed it here” | Public tunnel URL + optional preview screenshot/media attachment |
-| “I need to keep using it later” | Persistent deployment instead of temporary tunnel |
+- the agent has generated HTML and the user wants to open it in chat,
+- the user asks to publish, preview, embed, or share a generated UI,
+- a chat client cannot access `localhost`,
+- the expected result is a temporary public URL for a browser artifact.
 
-## Quick Workflow
+Do not use this as a production deployment workflow. Cloudflare quick tunnels are temporary and should be treated as preview links.
 
-1. **Define the artifact boundary**
-   - If the user’s request is clear, proceed without asking.
-   - Choose a simple default: static HTML/CSS/JS in an artifact folder.
-   - If data is needed, gather it from real sources first: project CLI, API, local files, user-provided content, or browser-accessible endpoints. Do not invent data.
+## Core rule
 
-2. **Generate the artifact**
-   - Prefer a self-contained `index.html` with inline CSS/JS for simple previews.
-   - For slightly larger demos, use an app folder:
+Never give the user a `localhost` or `127.0.0.1` URL. That address points to the user's device, not the Hermes runtime. Always publish through Cloudflare Tunnel and return the public `https://...trycloudflare.com` URL.
 
-   ```text
-   /absolute/project-or-temp-path/web-preview/
-     index.html
-     style.css       # optional
-     app.js          # optional
-     assets/         # optional
-   ```
+## Required shape
 
-   - Include a unique marker string such as the page title or `data-preview-marker="..."` so verification can check the right page loaded.
-   - If the artifact is data-driven, include generation metadata or a “last updated” label where useful.
+Use a folder like this:
 
-3. **Start a local static server**
-   - Use `terminal(background=true)` for long-lived servers.
-   - Bind to `0.0.0.0` when possible.
-   - Prefer `--directory` over relying on shell working-directory persistence.
-
-   ```bash
-   python3 -m http.server 8787 --bind 0.0.0.0 --directory /absolute/path/to/web-preview
-   ```
-
-   If the app needs a dev server instead of a static server, run the project’s dev command in background, bind to `0.0.0.0`, and use the printed/listening port.
-
-4. **Verify locally from inside the container**
-
-   ```bash
-   python3 - <<'PY'
-   import urllib.request
-   url = 'http://127.0.0.1:8787/'
-   text = urllib.request.urlopen(url, timeout=15).read().decode('utf-8', 'ignore')
-   print('bytes', len(text))
-   print(text[:120])
-   print('expected marker?', 'Expected page title or marker' in text)
-   PY
-   ```
-
-5. **Expose the server publicly**
-   - First check for existing tunnel tools:
-
-   ```bash
-   command -v cloudflared || command -v ngrok || command -v localtunnel || command -v lt || true
-   ```
-
-   - If none are installed, `npx --yes localtunnel --port <port>` works well for one-off public links. Run it as a background process and wait briefly for the URL:
-
-   ```bash
-   npx --yes localtunnel --port 8787
-   ```
-
-   In Hermes tools:
-
-   - Start via `terminal(background=true, notify_on_complete=true)`.
-   - Then `process(action='wait', timeout=5)` or `process(action='poll')`.
-   - Extract the line `your url is: https://...loca.lt`.
-
-6. **Verify the public URL**
-
-   ```bash
-   python3 - <<'PY'
-   import urllib.request
-   url = 'https://example.loca.lt'
-   response = urllib.request.urlopen(url, timeout=20)
-   text = response.read(1000).decode('utf-8', 'ignore')
-   print('status', response.status)
-   print(text[:200])
-   print('expected marker?', 'Expected page title or marker' in text)
-   PY
-   ```
-
-   Also verify with a real browser snapshot when possible, not only `urllib`/`curl`. Some tunnel providers, especially localtunnel, can return the app to programmatic requests while showing a human-facing interstitial/password page in the browser. If the browser sees an interstitial, switch tunnel providers (for example `npx --yes cloudflared tunnel --url http://127.0.0.1:<port>`) and re-verify both terminal and browser access before sharing.
-
-7. **Optionally create a preview image**
-   - A media preview is useful because Discord/Telegram unfurling can vary and public tunnels are temporary.
-   - Use browser screenshot tools when browser access can reach the URL.
-   - If the browser stack cannot reach the container’s localhost, use a public tunnel URL or generate a static preview image separately.
-   - Attach media in the final reply with:
-
-   ```text
-   MEDIA:/absolute/path/to/preview.png
-   ```
-
-8. **Return a chat-friendly result**
-   - Include the public URL plainly so Discord/Telegram can unfurl it.
-   - Include a one-line description of what is running.
-   - Mention whether the URL is temporary.
-   - Attach a preview image if available.
-
-## Generic Generation Recipe
-
-Use this recipe for any one-off static web artifact:
-
-1. Choose an output path:
-
-```bash
-mkdir -p /tmp/chat-web-preview
+```text
+/path/to/artifact/
+  index.html
 ```
 
-2. Write the HTML/CSS/JS. Include a marker:
+The produced HTML should be saved as `index.html`. If the generated UI has supporting files, keep them next to it:
+
+```text
+/path/to/artifact/
+  index.html
+  style.css
+  app.js
+  assets/
+```
+
+For simple one-off UIs, prefer a single self-contained `index.html` with inline CSS and JavaScript.
+
+## Workflow
+
+### 1. Write the produced HTML
+
+Create a dedicated artifact directory and write the HTML there.
+
+Recommended temporary path:
+
+```bash
+mkdir -p /tmp/chat-ui-preview
+```
+
+Save the produced HTML as:
+
+```text
+/tmp/chat-ui-preview/index.html
+```
+
+Include a unique marker in the HTML so verification can prove the correct UI loaded:
 
 ```html
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Preview App</title>
-</head>
-<body data-preview-marker="preview-app-v1">
-  <main>
-    <h1>Preview App</h1>
-  </main>
-</body>
-</html>
+<body data-preview-marker="chat-ui-preview-v1">
 ```
 
-3. Serve the folder:
+Use a marker that matches the artifact, for example `medicine-tracker-preview-v1` or `invoice-ui-preview-v1`.
+
+### 2. Serve the HTML locally
+
+Start a local HTTP server from the artifact folder. Bind to `0.0.0.0`.
 
 ```bash
-python3 -m http.server 8787 --bind 0.0.0.0 --directory /tmp/chat-web-preview
+python3 -m http.server 8787 --bind 0.0.0.0 --directory /tmp/chat-ui-preview
 ```
 
-4. Verify local HTML contains `preview-app-v1`.
+In Hermes, start this as a background process because the server must keep running:
 
-5. Start a public tunnel:
+```text
+terminal(command="python3 -m http.server 8787 --bind 0.0.0.0 --directory /tmp/chat-ui-preview", background=true)
+```
+
+If port `8787` is busy, choose another port instead of killing unknown processes.
+
+### 3. Verify the local server
+
+Before tunneling, verify that the local server returns the produced HTML and contains the marker.
 
 ```bash
-npx --yes localtunnel --port 8787
+python3 - <<'PY'
+import urllib.request
+url = 'http://127.0.0.1:8787/'
+text = urllib.request.urlopen(url, timeout=15).read().decode('utf-8', 'ignore')
+print('bytes', len(text))
+print('marker', 'chat-ui-preview-v1' in text)
+print(text[:160].replace('\n', ' '))
+PY
 ```
 
-6. Verify the tunnel URL contains `preview-app-v1`.
+Do not proceed if the marker check fails. Fix the artifact path, server directory, or HTML first.
 
-7. Reply with the tunnel URL and optional `MEDIA:` preview.
+### 4. Publish with Cloudflare Tunnel
 
-## Dynamic App Notes
+Prefer an installed `cloudflared` binary:
 
-For interactive apps, prefer client-side JavaScript unless a backend is necessary. If a backend is needed:
+```bash
+cloudflared tunnel --url http://127.0.0.1:8787
+```
 
-- Bind the backend server to `0.0.0.0`.
-- Expose the backend’s actual port through the tunnel.
-- Add a `/health` endpoint or a static marker route when practical.
-- Verify both the HTML and any required API routes.
-- Do not expose secrets in frontend code or public tunnel URLs.
+If `cloudflared` is not installed, use the npm package for a one-off tunnel:
 
-For project-specific dev servers:
+```bash
+npx --yes cloudflared tunnel --url http://127.0.0.1:8787
+```
 
-- Use the project’s documented start command.
-- Pass host/port flags explicitly, e.g. `--host 0.0.0.0 --port 8787` where supported.
-- If the dev server prints a different port, tunnel that port.
-- Check the logs with `process(action='poll')` before sharing the URL.
+In Hermes, run the tunnel as a background process and watch or poll its output:
 
-## Live Local Data Previews
+```text
+terminal(command="cloudflared tunnel --url http://127.0.0.1:8787", background=true)
+```
 
-When the user wants the preview to update from a local data source in real time, do **not** keep serving a static snapshot. Turn the preview into a tiny single-port app:
+or:
 
-- Keep `index.html` as the browser UI.
-- Add a small backend (`server.ts`, `server.js`, etc.) that serves the HTML and exposes API routes.
-- Read the real data source on every API request: SQLite DB, JSON/CSV files, existing project classes, or the project API.
-- Add `cache-control: no-store` on HTML/API responses and use browser `fetch(..., { cache: 'no-store' })` plus a cache-busting query string.
-- Add a manual Refresh button and a short auto-refresh interval when the user expects ongoing updates.
-- Verify both HTML and API routes locally, then verify both through the public tunnel.
+```text
+terminal(command="npx --yes cloudflared tunnel --url http://127.0.0.1:8787", background=true)
+```
 
-See `references/live-local-data-preview.md` for a reusable TypeScript/Node pattern, browser fetch loop, and verification commands.
+Extract the public URL from the tunnel logs. It normally looks like:
 
-## Important Notes for Discord/Telegram/Chat
+```text
+https://something.trycloudflare.com
+```
 
-- **Do not tell the user to open `localhost` or `127.0.0.1`**. That address points to their device, not the Hermes container.
-- Discord may unfurl a public URL automatically, but Hermes cannot force an iframe-style embed in a Discord message.
-- The safest “embed here” response is:
-  1. public URL,
-  2. short description,
-  3. attached preview image if available.
-- Public tunnel URLs are temporary. If the user comes back later, recreate the server/tunnel or deploy to a persistent host.
+### 5. Verify the public URL
 
-## Server Process Management
+Verify the Cloudflare URL before giving it to the user.
 
-- Use `terminal(background=true)` for servers/tunnels.
-- Use `notify_on_complete=false` only for genuine long-lived servers/tunnels.
-- Use `process(action='poll')` to confirm a server is still running.
-- Kill stale processes only when you started them or the user approves; otherwise choose another port.
-- Prefer changing ports if killing is risky.
+```bash
+python3 - <<'PY'
+import urllib.request
+url = 'https://something.trycloudflare.com'
+text = urllib.request.urlopen(url, timeout=20).read().decode('utf-8', 'ignore')
+print('bytes', len(text))
+print('marker', 'chat-ui-preview-v1' in text)
+print(text[:160].replace('\n', ' '))
+PY
+```
 
-If `python3 -m http.server` serves a directory listing instead of `index.html`, the server is pointed at the wrong directory. Restart it with the explicit `--directory /absolute/path/to/web-preview` flag.
+If browser tools are available, also open the public URL in the browser and check that it renders the intended UI. Terminal verification proves the route works; browser verification catches visual or tunnel issues.
 
-## Public Tunnel Troubleshooting
+### 6. Return the result
 
-- `npx localtunnel` can take a few seconds before printing the URL; wait/poll the process output.
-- Some localtunnel URLs may show an interstitial in browsers or require a client IP password. If that happens, try another tunnel provider (`cloudflared tunnel --url http://127.0.0.1:<port>` if installed) or deploy the static files.
-- If `Address already in use`, inspect/poll known process sessions first. If it is a stale server you started, kill it and restart. Otherwise choose another port.
-- Always verify the public URL from the container with `urllib.request`/`curl` before claiming it works.
-- For localtunnel specifically, terminal verification can be misleading: the app may load for `urllib` while a browser still sees the “Tunnel website ahead” page asking for the tunnel host IP. Treat browser interstitials as a failed share link; use `cloudflared tunnel --url http://127.0.0.1:<port>` or another provider and verify again.
-- If the browser tool cannot access `127.0.0.1`, verify via terminal and use the public URL for browser checks.
+Reply with:
 
-## Verification Checklist
+- the Cloudflare Tunnel URL,
+- a note that the URL is temporary,
+- optional screenshot/media preview if useful,
+- a short reminder that the server/tunnel process must keep running while the user uses the UI.
 
-- [ ] Artifact files exist at the expected absolute path.
-- [ ] Local server returns HTTP 200 and contains an expected marker string.
-- [ ] Public tunnel URL was captured from tunnel process output.
-- [ ] Public URL returns HTTP 200 and contains the expected marker string.
-- [ ] Interactive routes/API calls needed by the app were verified.
-- [ ] Final response includes the public URL, notes that it is temporary unless deployed, and attaches a preview image if created.
-- [ ] No fabricated data: content came from user instructions, real project data, or clearly labeled placeholders.
+Example final response:
+
+```text
+Published the UI here:
+https://example.trycloudflare.com
+
+This is a temporary Cloudflare Tunnel URL. It will work while the local server and tunnel process are running.
+```
+
+## Process management
+
+- Use `terminal(background=true)` for the local server and Cloudflare tunnel.
+- Use `process(action="poll")` to read tunnel output and confirm both processes are still running.
+- Use `process(action="kill")` only for processes you started or when the user asks you to stop the preview.
+- If a port is busy, prefer another port such as `8788`, `8789`, or `8790`.
+
+## Cloudflared troubleshooting
+
+### `cloudflared` not found
+
+Use:
+
+```bash
+npx --yes cloudflared tunnel --url http://127.0.0.1:<port>
+```
+
+If that fails because Node/npm is missing or network access is blocked, report the blocker and ask whether to install `cloudflared` or use another publishing method.
+
+### Tunnel starts but no URL appears
+
+Poll the process logs for a few seconds. Cloudflared can take time to print the `trycloudflare.com` URL. If it exits, read the full log and fix the reported issue.
+
+### Public URL loads the wrong thing
+
+Check the local server directory. The most common mistake is serving the parent folder instead of the folder containing `index.html`.
+
+Restart the server with an explicit directory:
+
+```bash
+python3 -m http.server <port> --bind 0.0.0.0 --directory /path/to/artifact
+```
+
+### Marker check fails
+
+Do not share the link. The marker check is the guardrail that prevents sending the user a stale or wrong UI.
+
+Fix one of these:
+
+- wrong artifact folder,
+- old server still running on the port,
+- `index.html` missing or not updated,
+- tunnel pointing at the wrong port.
+
+## Verification checklist
+
+Before finalizing, confirm:
+
+- [ ] produced HTML is saved as `index.html` in a known artifact folder,
+- [ ] HTML contains a unique marker,
+- [ ] local server returns HTTP 200 and contains the marker,
+- [ ] Cloudflare Tunnel printed a `trycloudflare.com` URL,
+- [ ] public URL returns HTTP 200 and contains the marker,
+- [ ] final response includes the public URL and says it is temporary.

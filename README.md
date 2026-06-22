@@ -83,23 +83,22 @@ skills/
 
 **Description**
 
-> Create small HTML/web app previews from chat, run them locally, expose them with a public tunnel, and share a verified URL back into Discord, Telegram, or similar chat clients.
+> Publish produced HTML as a temporary chat-openable UI by serving it locally, exposing it with Cloudflare Tunnel, and returning a verified URL.
 
 **Use this for**
 
-- one-off HTML prototypes and interactive demos
-- temporary web UIs for local tracker data
-- chat-friendly preview links for Discord, Telegram, or WhatsApp
-- local server plus Cloudflare/localtunnel sharing workflows
-- verifying that public tunnel URLs really load the intended app
+- generated HTML UIs that need to be opened from Discord, Telegram, or WhatsApp
+- one-off browser previews created by an agent
+- publishing an already-produced `index.html` through Cloudflare Tunnel
+- returning a verified `trycloudflare.com` URL to the user
 
 **Highlights**
 
-- avoids sending users localhost links that cannot work from chat clients
-- favors simple static HTML/CSS/JS unless a backend is needed
-- includes local and public URL verification steps
-- supports live local data previews through a tiny backend API
-- documents tunnel troubleshooting and preview screenshot/media delivery
+- treats the HTML as a generic browser artifact, not as a specific app type
+- avoids giving users localhost links that cannot work from chat clients
+- standardizes on `cloudflared tunnel --url` for publishing
+- requires local and public marker verification before sharing the URL
+- clearly labels Cloudflare Tunnel links as temporary previews
 
 **Path**
 
