@@ -8,6 +8,7 @@ At the moment, this repo contains:
 
 - [`personal-data-tracker-app`](#personal-data-tracker-app)
 - [`headless-ui-kit-builder`](#headless-ui-kit-builder)
+- [`chat-embeddable-web-apps`](#chat-embeddable-web-apps)
 
 ## Repository structure
 
@@ -76,6 +77,33 @@ skills/
 **Path**
 
 - `skills/headless-ui-kit-builder/SKILL.md`
+
+
+### `chat-embeddable-web-apps`
+
+**Description**
+
+> Create small HTML/web app previews from chat, run them locally, expose them with a public tunnel, and share a verified URL back into Discord, Telegram, or similar chat clients.
+
+**Use this for**
+
+- one-off HTML prototypes and interactive demos
+- temporary web UIs for local tracker data
+- chat-friendly preview links for Discord, Telegram, or WhatsApp
+- local server plus Cloudflare/localtunnel sharing workflows
+- verifying that public tunnel URLs really load the intended app
+
+**Highlights**
+
+- avoids sending users localhost links that cannot work from chat clients
+- favors simple static HTML/CSS/JS unless a backend is needed
+- includes local and public URL verification steps
+- supports live local data previews through a tiny backend API
+- documents tunnel troubleshooting and preview screenshot/media delivery
+
+**Path**
+
+- `skills/chat-embeddable-web-apps/SKILL.md`
 
 ## Using this repo with Hermes Agent
 
